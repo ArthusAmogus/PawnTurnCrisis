@@ -30,7 +30,14 @@ public class InventoryUI : MonoBehaviour
     [SerializeField] float rot = 30;
     [SerializeField] float pos = 30;
 
-    
+
+    public static InventoryUI Instance;
+    private void OnEnable()
+    {
+        Instance = this;
+    }
+
+
 
     private void Start()
     {

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1968dd959a363114588e78179ddc1412, type: 3}
+  m_Name: Cannabis Bomb
+  m_EditorClassIdentifier: 
+  itemName: Cannabis Bomb
+  itemDescription: Causes enemies to go berserk but vulnerable. +200 ATK, -20 DEF,
+    +3 Speed
+  itemIcon: {fileID: 0}
+  RarityValue: 3
+  PerTurnDuration: 0
+  particleEffect: {fileID: 0}
+  AddedHP: 0
+  AddedATK: 200
+  AddedElemATK: 0
+  AddedCritRate: 0
+  AddedDEF: -20
+  AddedSPEED: 3

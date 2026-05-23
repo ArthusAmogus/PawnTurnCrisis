@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 using TMPro;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using static ObjectAutoScaleEffect;
@@ -10,6 +9,10 @@ using Cursor = UnityEngine.Cursor;
 
 public class GameManager : MonoBehaviour
 {
+    [Header("Debug")]
+    [SerializeField] private bool BypassVentReq;
+    [SerializeField] private bool AvoidPlayerDamage;
+
     [Header("Debug - Panels")]
     [SerializeField] private float BulletDiagonalAmount;
     [SerializeField] private int ChoiceBulletAmount;
@@ -192,13 +195,23 @@ public class GameManager : MonoBehaviour
     [Header("Vent Properties")]
     [SerializeField] GameObject VentPanel;
     [SerializeField] Transform VentBar;
-    [SerializeField] GameObject VentSight;
     [SerializeField] bool VentModeControls;
     [SerializeField] float VentDamage;
+    [SerializeField] GameObject UltExplosion;
+    [SerializeField] GameObject UltCharge;
 
+    [Header("Analyze Properties")]
+    [SerializeField] CanvasGroup AnalyzePanel;
+    [SerializeField] bool AnalyzeControls;
+    [SerializeField] TextMeshProUGUI PlayerStatsText;
+    [SerializeField] TextMeshProUGUI[] EnemyStatsText;
 
-
-
+    [Header("Negotiate Properties")]
+    [SerializeField] GameObject NegotiateTitleText;
+    [SerializeField] GameObject NegotiateLineU;
+    [SerializeField] GameObject NegotiateLineD;
+    [SerializeField] GameObject NegotiateSelection;
+    [SerializeField] GameObject NegotiateList;
 
 
 
@@ -214,6 +227,14 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
+        if (!isPlayerAlive)
+        {
+            doChoiceControls = false;
+            doShootControls = false;
+            VentModeControls = false;
+            AnalyzeControls = false;
+        }
+
         if (c_Intro!=null && isIntroSkippable)
         {
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Z))
@@ -249,29 +270,34 @@ public class GameManager : MonoBehaviour
                 {
                     case 0:
                         {
-                            if (HeldCalliber==HeldCalliberMax)
+                            if (HeldCalliber==HeldCalliberMax|| BypassVentReq)
                             {
                                 VentMode();
                                 HeldCalliber = 0;
                             }
                             else
                             {
-                                DisplayMessage("Not enough Held Calliber! End turn with remaining bullets to obtain some.", false);
+                                DisplayMessage("Not enough Held Calliber! End turn with remaining bullets to obtain some.", false, 2);
                                 aud.PlaySound(aud.SoundFX, aud.s_NoBullets);
                             }
                             break;
                         }
                     case 1:
                         {
-                            NegotiateMode(true);
+                            AnalyzeMode(true);
                             break;
                         }
                     case 2:
                         {
-                            InventoryMode(true);
+                            NegotiateMode(true);
                             break;
                         }
                     case 3:
+                        {
+                            InventoryMode(true);
+                            break;
+                        }
+                    case 4:
                         {
                             ShootMode(true);
                             break;
@@ -280,8 +306,6 @@ public class GameManager : MonoBehaviour
             }
         }
 
-
-        //Attack Panel Controls
         if (doShootControls)
         {
             if (PlayerStats.HP<=0 && isPlayerAlive)
@@ -301,7 +325,7 @@ public class GameManager : MonoBehaviour
                 }
                 else
                 {
-                    EndTurn();
+                    if (isPlayerAlive) EndTurn();
                 }
             }
 
@@ -326,13 +350,43 @@ public class GameManager : MonoBehaviour
             }
         }
 
-        //Vent Controls
         if (VentModeControls)
         {
             VentBar.localScale = new(VentDamage/1000, 1, 1);
+            ColorBleed.intensity = (VentDamage/1000)*100;
+            ColorBleed.shift = Mathf.Lerp(ColorBleed.shift, 0.02f, 0.1f);
             if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
             {
+                //Bar and Screen VFXs
                 if (VentDamage<1000) VentDamage += Random.Range(10, 30);
+                ColorBleed.shift = Random.Range(-0.5f*(VentDamage/1000)*2, 0.5f* (VentDamage / 1000) * 2);
+
+                //Muzzle Effect
+                aud.PlaySound(aud.SoundFX, aud.s_UltShot);
+
+                var muzzleflash = Instantiate(MuzzleFlash);
+                var cursorTransform = SightCursor.transform;
+                muzzleflash.transform.SetParent(cursorTransform.parent, false);
+
+                if (SightCursor.TryGetComponent<RectTransform>(out var cursorRT) &&
+                    muzzleflash.TryGetComponent<RectTransform>(out var muzzleRT))
+                {
+                    muzzleRT.localRotation = Quaternion.identity;
+                    muzzleRT.anchoredPosition = cursorRT.anchoredPosition;
+                    muzzleRT.SetAsLastSibling();
+                }
+                else
+                {
+                    muzzleflash.transform.SetPositionAndRotation(cursorTransform.position, cursorTransform.rotation);
+                }
+            }
+        }
+
+        if (AnalyzeControls)
+        {
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(3))
+            {
+                AnalyzeMode(false);
             }
         }
 
@@ -358,7 +412,7 @@ public class GameManager : MonoBehaviour
     {
         aud.DoPlayMusic(aud.m_ChromaticRose, aud.m_ChromaticRose_wapred);
 
-        BorderOffset = Screen.height / 2;
+        BorderOffset       = Screen.height / 2;
         BorderOpenDistance = Screen.height / 2;
         BorderCloseDistance = 0;
         BorderCinematizeDistance = (Screen.height/2)-(Screen.height/7);
@@ -369,7 +423,6 @@ public class GameManager : MonoBehaviour
         c_Intro = StartCoroutine(Intro());
         ColorBleed = Camera.main.gameObject.GetComponent<ShaderEffect_BleedingColors>();
         HighScoreCounter.text = "HIGHSCORE: " + ScoreSystem.GetHighestScoreString();
-        MessagePanel.LeanScaleY(0, 0);
     }
 
 
@@ -489,7 +542,7 @@ public class GameManager : MonoBehaviour
 
 
     //Choice Panel Methods
-    public void DisplayMessage(string msg, bool good)
+    public void DisplayMessage(string msg, bool good, float time)
     {
         LeanTween.cancel(MessagePanel);
         if (good) aud.PlaySound(aud.SoundFX, aud.s_DisplayGoodMessage);
@@ -499,7 +552,7 @@ public class GameManager : MonoBehaviour
         {
             MessagePanel.LeanScaleY(1, 0.3f).setEaseOutQuint().setOnComplete(() =>
             {
-                MessagePanel.LeanScaleY(0, 0.3f).setEaseOutQuint().setDelay(2);
+                MessagePanel.LeanScaleY(0, 0.3f).setEaseOutQuint().setDelay(time);
             });
         });
     }
@@ -514,7 +567,7 @@ public class GameManager : MonoBehaviour
         if (item is ItemRemedyClass)
         {
             ItemRemedyClass remedy = item as ItemRemedyClass;
-            for (int i=0; i<6; i++)
+            for (int i = 0; i < 6; i++)
             {
                 DoPlayerView();
                 switch (i)
@@ -522,38 +575,133 @@ public class GameManager : MonoBehaviour
                     case 0:
                         if (remedy.AddedHP == 0) break;
                         PlayerStats.HP += remedy.AddedHP;
-                        DisplayMessage("Your HP has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedHP > 0)
+                        {
+                            if (PlayerStats.HP > PlayerStats.MaxHP)
+                            {
+                                PlayerStats.HP = PlayerStats.MaxHP;
+                                DisplayMessage($"You maxxed out your HP!", true, 2);
+                            }
+                            else
+                                DisplayMessage($"+{remedy.AddedHP} to your HP!", true, 2);
+                        }
+                        else if (remedy.AddedHP < 0)
+                            DisplayMessage($"{remedy.AddedHP} to your HP!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                     case 1:
                         if (remedy.AddedDEF == 0) break;
                         PlayerStats.DEF += remedy.AddedDEF;
-                        DisplayMessage("Your DEF has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedDEF > 0)
+                            DisplayMessage($"+{remedy.AddedDEF} to your DEF!", true, 2);
+                        else if (remedy.AddedDEF < 0)
+                            DisplayMessage($"{remedy.AddedDEF} to your DEF!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                     case 2:
                         if (remedy.AddedATK == 0) break;
                         PlayerStats.ATK += remedy.AddedATK;
-                        DisplayMessage("Your ATK has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedATK > 0)
+                            DisplayMessage($"+{remedy.AddedATK} to your ATK!", true, 2);
+                        else if (remedy.AddedATK < 0)
+                            DisplayMessage($"{remedy.AddedATK} to your ATK!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                     case 3:
                         if (remedy.AddedElemATK == 0) break;
                         PlayerStats.ElemATK += remedy.AddedElemATK;
-                        DisplayMessage("Your Element ATK has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedElemATK > 0)
+                            DisplayMessage($"+{remedy.AddedElemATK} to your ElemATK!", true, 2);
+                        else if (remedy.AddedElemATK < 0)
+                            DisplayMessage($"{remedy.AddedElemATK} to your ElemATK!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                     case 4:
                         if (remedy.AddedCritRate == 0) break;
                         PlayerStats.CritRate += remedy.AddedCritRate;
-                        DisplayMessage("Your CritRate has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedCritRate > 0)
+                            DisplayMessage($"+{remedy.AddedCritRate} to your CritRate!", true, 2);
+                        else if (remedy.AddedCritRate < 0)
+                            DisplayMessage($"{remedy.AddedCritRate} to your CritRate!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                     case 5:
                         if (remedy.AddedSPEED == 0) break;
                         PlayerStats.Speed += remedy.AddedSPEED;
-                        DisplayMessage("Your SPEED has increased!", true);
-                        yield return new WaitForSeconds(1.5f);
+                        if (remedy.AddedSPEED > 0)
+                            DisplayMessage($"+{remedy.AddedSPEED} to your Speed!", true, 2);
+                        else if (remedy.AddedSPEED < 0)
+                            DisplayMessage($"{remedy.AddedSPEED} to your Speed!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                }
+            }
+        }
+
+
+        List<StatsSystem> enemyStats = new();
+        foreach (GameObject enemy in CurEnemies) enemyStats.Add(enemy.GetComponentInChildren<StatsSystem>());
+        if (item is ItemInflictorClass)
+        {
+            ItemInflictorClass inflictor = item as ItemInflictorClass;
+            for (int i = 0; i < 6; i++)
+            {
+                DoEnemyView();
+                switch (i)
+                {
+                    case 0:
+                        if (inflictor.AddedHP == 0) break;
+                        foreach (var enemy in enemyStats) enemy.HP = inflictor.AddedHP;
+                        if (inflictor.AddedHP > 0)
+                            DisplayMessage($"+{inflictor.AddedHP} to enemies' HP!", true, 2);
+                        else if (inflictor.AddedHP < 0)
+                            DisplayMessage($"{inflictor.AddedHP} to enemies' HP!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    case 1:
+                        if (inflictor.AddedDEF == 0) break;
+                        foreach (var enemy in enemyStats) enemy.DEF = inflictor.AddedDEF;
+                        if (inflictor.AddedDEF > 0)
+                            DisplayMessage($"+{inflictor.AddedDEF} to enemies' DEF!", true, 2);
+                        else if (inflictor.AddedDEF < 0)
+                            DisplayMessage($"{inflictor.AddedDEF} to enemies' DEF!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    case 2:
+                        if (inflictor.AddedATK == 0) break;
+                        foreach (var enemy in enemyStats) enemy.ATK = inflictor.AddedATK;
+                        if (inflictor.AddedATK > 0)
+                            DisplayMessage($"+{inflictor.AddedATK} to enemies' ATK!", true, 2);
+                        else if (inflictor.AddedATK < 0)
+                            DisplayMessage($"{inflictor.AddedATK} to enemies' ATK!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    case 3:
+                        if (inflictor.AddedElemATK == 0) break;
+                        foreach (var enemy in enemyStats) enemy.ElemATK = inflictor.AddedElemATK;
+                        if (inflictor.AddedElemATK > 0)
+                            DisplayMessage($"+{inflictor.AddedElemATK} to enemies' ElemATK!", true, 2);
+                        else if (inflictor.AddedElemATK < 0)
+                            DisplayMessage($"{inflictor.AddedElemATK} to enemies' ElemATK!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    case 4:
+                        if (inflictor.AddedCritRate == 0) break;
+                        foreach (var enemy in enemyStats) enemy.CritRate = inflictor.AddedCritRate;
+                        if (inflictor.AddedCritRate > 0)
+                            DisplayMessage($"+{inflictor.AddedCritRate} to enemies' CritRate!", true, 2);
+                        else if (inflictor.AddedCritRate < 0)
+                            DisplayMessage($"{inflictor.AddedCritRate} to enemies' CritRate!", false, 2);
+                        yield return new WaitForSeconds(1f);
+                        break;
+                    case 5:
+                        if (inflictor.AddedSPEED == 0) break;
+                        foreach (var enemy in enemyStats) enemy.Speed = inflictor.AddedSPEED;
+                        if (inflictor.AddedSPEED > 0)
+                            DisplayMessage($"+{inflictor.AddedSPEED} to enemies' Speed!", true, 2);
+                        else if (inflictor.AddedSPEED < 0)
+                            DisplayMessage($"{inflictor.AddedSPEED} to enemies' Speed!", false, 2);
+                        yield return new WaitForSeconds(1f);
                         break;
                 }
             }
@@ -608,6 +756,7 @@ public class GameManager : MonoBehaviour
 
     public void NegotiateMode(bool show)
     {
+        NegotiateUI.Instance.gameObject.SetActive(true);
         NegotiateUI.Instance.ShowNegotiatePanel = show;
         if (show)
         {
@@ -617,14 +766,38 @@ public class GameManager : MonoBehaviour
             HideChoicePanel(true);
             HideStatsPanel(true);
             DoNegotiateView();
+
+            NegotiateTitleText.SetActive(true);
+            LeanTween.cancel(NegotiateTitleText);
+            NegotiateLineU.SetActive(true);
+            LeanTween.cancel(NegotiateLineU);
+            NegotiateLineD.SetActive(true);
+            LeanTween.cancel(NegotiateLineD);
+            NegotiateList.SetActive(true);
+            LeanTween.cancel(NegotiateList);
+            NegotiateTitleText.LeanScaleX(35, 0).setOnComplete(() =>
+            {
+                NegotiateTitleText.LeanScaleX(2, 0.3f).setEaseOutQuart();
+            });
+
+            NegotiateLineU.LeanRotate(new(0, 0, 90), 0).setOnComplete(() =>
+            {
+                NegotiateLineU.LeanRotate(new(0, 0, 0), 0.4f).setEaseInQuad();
+            });
+            NegotiateLineD.LeanRotate(new(0, 0, -90), 0).setOnComplete(() =>
+            {
+                NegotiateLineD.LeanRotate(new(0, 0, 0), 0.4f).setEaseInQuad();
+            });
+
+            //Todo Negotiate List
         }
         else
         {
-            StartCoroutine(delayedNegotiateMode());
+            StartCoroutine(delayedNegotiateHide());
         }
     }
 
-    IEnumerator delayedNegotiateMode()
+    IEnumerator delayedNegotiateHide()
     {
         yield return new WaitForSeconds(0.5f);
         Cursor.visible = true;
@@ -633,7 +806,41 @@ public class GameManager : MonoBehaviour
         HideStatsPanel(false);
         DoCinemaView();
         StartUpChoicePanel(false);
+
+        LeanTween.cancel(NegotiateTitleText);
+        LeanTween.cancel(NegotiateLineU);
+        LeanTween.cancel(NegotiateLineD);
+        LeanTween.cancel(NegotiateList);
+        NegotiateTitleText.LeanScaleX(2, 0).setOnComplete(() =>
+        {
+            NegotiateTitleText.LeanScaleX(35, 0.1f).setEaseInQuart().setOnComplete(() =>
+            {
+                NegotiateList.SetActive(false);
+                NegotiateTitleText.SetActive(false);
+                NegotiateUI.Instance.gameObject.SetActive(false);
+            });
+        });
+
+        NegotiateLineU.LeanRotate(new(0, 0, 0), 0).setOnComplete(() =>
+        {
+            NegotiateLineU.LeanRotate(new(0, 350, 0), 0.5f).setEaseInQuad().setOnComplete(() =>
+            {
+                NegotiateLineU.SetActive(false);
+            });
+        });
+        NegotiateLineD.LeanRotate(new(0, 0, 0), 0).setOnComplete(() =>
+        {
+            NegotiateLineD.LeanRotate(new(0, -350, 0), 0.5f).setEaseInQuad().setOnComplete(() =>
+            {
+                NegotiateLineD.SetActive(false);
+            });
+        });
+
+        //To do negotiate list
     }
+
+
+
 
     void ChangeList(string direction)
     {
@@ -687,7 +894,7 @@ public class GameManager : MonoBehaviour
 
         //List Movement
         LeanTween.cancel(List);
-        List.transform.LeanMoveLocalY(-160 + (ChoiceIndex * 80), AnimationTime).setEaseOutQuint();
+        List.transform.LeanMoveLocalY(-240 + (ChoiceIndex * 80), AnimationTime).setEaseOutQuint();
 
 
     }
@@ -722,6 +929,8 @@ public class GameManager : MonoBehaviour
 
     void VentMode()
     {
+        AttackHalo.autoScaleType = AutoScaleType.Grow;
+        AttackHalo.gameObject.SetActive(true);
         VentDamage = 0;
         ClipIndex = 0;
         VentPanel.SetActive(true);
@@ -731,6 +940,8 @@ public class GameManager : MonoBehaviour
         StartCoroutine(VentTimer());
         VentModeControls = true;
         aud.PlaySound(aud.SoundFX, aud.s_Ult);
+        Cursor.visible = false;
+        SightCursor.SetActive(true);
     }
 
     IEnumerator VentTimer()
@@ -740,14 +951,28 @@ public class GameManager : MonoBehaviour
         {
             enemyStats.Add(enemy.GetComponentInChildren<StatsSystem>());
         }
-        yield return new WaitForSeconds(3);
+
+
+        yield return new WaitForSeconds(2f);
+        Instantiate(UltCharge, ViewPoints[2].position, Quaternion.identity);
+        yield return new WaitForSeconds(0.5f);
+        Instantiate(UltCharge, ViewPoints[0].position, Quaternion.identity);
+        yield return new WaitForSeconds(0.5f);
+
+
+        VentModeControls = false;
+        for (int i = 0; i < 8; i++) Instantiate(UltExplosion, (ViewPoints[0].position) + new Vector3(ViewPoints[0].position.x, Random.Range(-1, 1), Random.Range(-4, 4)), Quaternion.identity);
         aud.PlaySound(aud.SoundFX, aud.s_UltExplosion);
         foreach (StatsSystem stats in enemyStats) stats.TakeDamage((int)VentDamage);
-        VentModeControls = false;
         VentPanel.SetActive(false);
         DoCinemaView();
+        ColorBleed.intensity = 100;
+        ColorBleed.shift = 0.3f;
+        LeanTween.value(gameObject, ColorBleed.shift, 0.02f, 1f)
+            .setOnUpdate((float val) => ColorBleed.shift = val);
 
-        //todo exploode
+        LeanTween.value(gameObject, ColorBleed.intensity, 10f, 1f)
+            .setOnUpdate((float val) => ColorBleed.intensity = val);
         yield return new WaitForSeconds(1);
         AttackHalo.autoScaleType = AutoScaleType.Grow;
         AttackHalo.gameObject.SetActive(true);
@@ -763,6 +988,61 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    void AnalyzeMode(bool show)
+    {
+        if (show)
+        {
+            AnalyzeControls = true;
+            DoLandscapeView();
+            PlayerStatsText.text = 
+                $"HP: {PlayerStats.HP}/1000\r\n" +
+                $"ATK: {PlayerStats.ATK}\r\n" +
+                $"ElemATK: {PlayerStats.ElemATK}\r\n" +
+                $"CritRate: {PlayerStats.CritRate}%\r\n" +
+                $"DEF: {PlayerStats.DEF}\r\n" +
+                $"SPEED: {PlayerStats.Speed}\r\n";
+
+            int i = 0;
+            foreach (GameObject enemy in CurEnemies)
+            {
+                StatsSystem stats = enemy.GetComponentInChildren<StatsSystem>();
+                EnemyStatsText[i].gameObject.SetActive(true);
+                EnemyStatsText[i].text =
+                $"HP: {stats.HP}\r\n" +
+                $"ATK: {stats.ATK}\r\n" +
+                $"ElemATK: {stats.ElemATK}\r\n" +
+                $"CritRate: {stats.CritRate}%\r\n" +
+                $"DEF: {stats.DEF}\r\n" +
+                $"SPEED: {stats.Speed}\r\n";
+                i++;
+            }
+
+            LeanTween.value(gameObject, AnalyzePanel.alpha, 1, 0.2f)
+            .setOnUpdate((float val) => AnalyzePanel.alpha = val);
+            HideChoicePanel(true);
+            HideStatsPanel(true);
+        }
+        else
+        {
+            AnalyzeControls = false;
+            LeanTween.value(gameObject, AnalyzePanel.alpha, 0, 0.2f)
+            .setOnUpdate((float val) => AnalyzePanel.alpha = val).setOnComplete(() =>
+            {
+                foreach (var text in EnemyStatsText) text.gameObject.SetActive(false);
+            });
+            StartCoroutine(delayedAnalyzeHide());
+        }
+    }
+
+    IEnumerator delayedAnalyzeHide()
+    {
+        yield return new WaitForSeconds(0.5f);
+        HideChoicePanel(false);
+        HideStatsPanel(false);
+        DoCinemaView();
+        StartUpChoicePanel(false);
+    }
+
 
 
     //Enemy Methods
@@ -771,14 +1051,12 @@ public class GameManager : MonoBehaviour
         if (isParrying)
         {
             aud.PlaySound(aud.SoundFX, aud.s_Parried);
-            Debug.Log("PARRY");
-            StartCoroutine(Parried());
+            StartCoroutine(Parried(true));
         }
         else
         {
             aud.PlaySound(aud.SoundFX, aud.s_EnemyBash);
-            Debug.Log("Player took "+dmg+" dmg!!!");
-            PlayerStats.TakeDamage(dmg);
+            if (!AvoidPlayerDamage) PlayerStats.TakeDamage(dmg);
             StartCoroutine(Damaged());
             if (criticalhit)
             {
@@ -796,17 +1074,17 @@ public class GameManager : MonoBehaviour
         {
             AllEnemies[i].transform.Find("Idle").gameObject.SetActive(false);
         }
-        StartCoroutine(StartEnemyTurnCorou());
+        StartEnemyTurnCorou();
     }
 
-    IEnumerator StartEnemyTurnCorou()
+    void StartEnemyTurnCorou()
     {
         for (int i = 0; i < CurEnemies.Count; i++)
         {
+            if (CurEnemies[i] == null) continue;
             CurEnemies[i].transform.GetChild(0).gameObject.SetActive(true);
             CurEnemies[i].transform.GetChild(0).GetComponent<StatsSystem>().RestoreMaterial();
-            CurEnemies[i].transform.GetChild(0).GetComponent<EnemyAI>().DoStartTurn();
-            yield return new WaitForSeconds(1);
+            CurEnemies[i].transform.GetChild(0).GetComponent<EnemyAI>().DoStartTurn(i);
         }
     }
 
@@ -946,35 +1224,6 @@ public class GameManager : MonoBehaviour
         ColorBleed.shift = 0.01f;
     }
 
-    IEnumerator ShootEffect()
-    {
-        aud.PlaySound(aud.SoundFX, aud.s_GunShot);
-
-        ColorBleed.intensity = Random.Range(5f, 50f);
-        ColorBleed.shift = Random.Range(0f, 0.1f);
-
-        var muzzleflash = Instantiate(MuzzleFlash);
-        var cursorTransform = SightCursor.transform;
-        muzzleflash.transform.SetParent(cursorTransform.parent, false);
-
-        if (SightCursor.TryGetComponent<RectTransform>(out var cursorRT) &&
-            muzzleflash.TryGetComponent<RectTransform>(out var muzzleRT))
-        {
-            muzzleRT.localRotation = Quaternion.identity;
-            muzzleRT.anchoredPosition = cursorRT.anchoredPosition;
-            muzzleRT.SetAsLastSibling();
-        }
-        else
-        {
-            muzzleflash.transform.SetPositionAndRotation(cursorTransform.position, cursorTransform.rotation);
-        }
-
-        yield return new WaitForSeconds(0.1f);
-
-        ColorBleed.intensity = 10;
-        ColorBleed.shift = 0.01f;
-    }
-
     void CinematizedHideWaveAndScore(bool v)
     {
         LeanTween.cancel(ScoreCounterOnCinematize.gameObject);
@@ -1057,6 +1306,35 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    IEnumerator ShootEffect()
+    {
+        aud.PlaySound(aud.SoundFX, aud.s_GunShot);
+
+        ColorBleed.intensity = Random.Range(5f, 50f);
+        ColorBleed.shift = Random.Range(0f, 0.1f);
+
+        var muzzleflash = Instantiate(MuzzleFlash);
+        var cursorTransform = SightCursor.transform;
+        muzzleflash.transform.SetParent(cursorTransform.parent, false);
+
+        if (SightCursor.TryGetComponent<RectTransform>(out var cursorRT) &&
+            muzzleflash.TryGetComponent<RectTransform>(out var muzzleRT))
+        {
+            muzzleRT.localRotation = Quaternion.identity;
+            muzzleRT.anchoredPosition = cursorRT.anchoredPosition;
+            muzzleRT.SetAsLastSibling();
+        }
+        else
+        {
+            muzzleflash.transform.SetPositionAndRotation(cursorTransform.position, cursorTransform.rotation);
+        }
+
+        yield return new WaitForSeconds(0.1f);
+
+        ColorBleed.intensity = 10;
+        ColorBleed.shift = 0.01f;
+    }
+
     void ReloadAttackPanel(int bullet)
     {
         if (bullet < 6)
@@ -1098,25 +1376,30 @@ public class GameManager : MonoBehaviour
         Tonfa.transform.LeanRotateZ(0, 0.2f).setEaseInQuart();
         yield return new WaitForSeconds(0.1f);
         isParrying = false;
-        yield return new WaitForSeconds(0.4f*(10/(9+PlayerStats.Speed))); //Cooldown
+        //yield return new WaitForSeconds(0.4f*(10/(9+PlayerStats.Speed))); //Cooldown
         c_Parry = null;
     }
 
-    IEnumerator Parried()
+    public void DoParryEffect()
+    {
+        StartCoroutine(Parried(false));
+    }
+
+    IEnumerator Parried(bool onSelf)
     {
         float RandomIntensity = Random.Range(10, 200);
-        float RandomShift = Random.Range(0, 1);
+        float RandomShift = Random.Range(0, 2);
         ColorBleed.intensity = RandomIntensity;
         ColorBleed.shift = RandomShift;
         ParryEffect.SetActive(true);
         Time.timeScale = 0;
-        Instantiate(DamageEffectParticle, GameObject.Find("Player").transform.position + new Vector3(1, 1, 0), Quaternion.identity);
+        if (onSelf) Instantiate(DamageEffectParticle, GameObject.Find("Player").transform.position + new Vector3(1, 1, 0), Quaternion.identity);
         yield return new WaitForSecondsRealtime(0.2f);
         Time.timeScale = 1;
         ParryEffect.SetActive(false);
         ColorBleed.intensity = 10;
-        ColorBleed.shift = 0.01f;
-        AddScore("Parried");
+        ColorBleed.shift = 0.02f;
+        if (onSelf) AddScore("Parried");
     }
 
 
@@ -1258,6 +1541,9 @@ public class GameManager : MonoBehaviour
     //Scene
     IEnumerator GameOver()
     {
+        doChoiceControls = false;
+        doShootControls = false;
+        VentModeControls = false;
         aud.DoLerpPitch(aud.Music, 0.4f, 7f);
         aud.PlaySound(aud.SoundFX, aud.s_FailedStage);
         ColorBleed.intensity = 400;
@@ -1339,6 +1625,8 @@ public class GameManager : MonoBehaviour
         HideHighscorePanel(true);
         
         index = 0;
+        ColorBleed.shift = 0.02f;
+        ColorBleed.intensity = 10;
         ChoicePanel.transform.LeanMoveX(RightPanelHideDistance + RightPanelHideOffset, AnimationTime).setEaseOutQuint().setOnComplete(() =>
         {
             StartUpChoicePanel(true);
