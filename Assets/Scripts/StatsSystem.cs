@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Rendering;
-using UnityEngine.UIElements;
 
 public class StatsSystem : MonoBehaviour
 {
@@ -38,7 +36,7 @@ public class StatsSystem : MonoBehaviour
     [SerializeField] private bool DamageEntity;
 
     //Data
-    private List<Material> normal_mat = new();
+    private readonly List<Material> normal_mat = new();
     private List<Renderer> render = new();
     private bool IsDead;
     private Coroutine c_dmgEffect;
@@ -120,7 +118,27 @@ public class StatsSystem : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
-        int actualDamage = Mathf.Max(damage / ((DEF + 10) / 10), 0);
+        float divisorFactor = (DEF + 10f) / 10f;
+        int actualDamage;
+
+        if (DEF > 0)
+        {
+            float multiplier = (-0.1f * DEF) + 1.2f;
+            actualDamage = (int)(damage * multiplier);
+        }
+        else if (DEF == 0)
+        {
+            float multiplier = 1.2f;
+            actualDamage = (int)(damage * multiplier);
+        }
+        else
+        {
+            float multiplier = (-0.1f * DEF) + 1.2f;
+            actualDamage = (int)(damage * multiplier);
+        }
+
+
+
         if (DoDamage)
         {
             HP -= actualDamage;

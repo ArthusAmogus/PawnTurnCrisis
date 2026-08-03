@@ -710,7 +710,7 @@ public class GameManager : MonoBehaviour
         DoFirstPersonView();
         HideChoicePanel(true);
         HideAttackPanel(false);
-        ReloadAttackPanel(0);
+        ReloadAttackPanel(3);
         DoFirstPersonView();
         StartEnemyTurn();
     }
@@ -740,11 +740,11 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            StartCoroutine(delayedInventoryHide());
+            StartCoroutine(DelayedInventoryHide());
         }
     }
 
-    IEnumerator delayedInventoryHide()
+    IEnumerator DelayedInventoryHide()
     {
         InvUI.ShowInventory(false);
         yield return new WaitForSeconds(0.5f);
@@ -793,11 +793,11 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            StartCoroutine(delayedNegotiateHide());
+            StartCoroutine(DelayedNegotiateHide());
         }
     }
 
-    IEnumerator delayedNegotiateHide()
+    IEnumerator DelayedNegotiateHide()
     {
         yield return new WaitForSeconds(0.5f);
         Cursor.visible = true;
@@ -969,10 +969,10 @@ public class GameManager : MonoBehaviour
         ColorBleed.intensity = 100;
         ColorBleed.shift = 0.3f;
         LeanTween.value(gameObject, ColorBleed.shift, 0.02f, 1f)
-            .setOnUpdate((float val) => ColorBleed.shift = val);
+            .setOnUpdate(val => ColorBleed.shift = val);
 
         LeanTween.value(gameObject, ColorBleed.intensity, 10f, 1f)
-            .setOnUpdate((float val) => ColorBleed.intensity = val);
+            .setOnUpdate(val => ColorBleed.intensity = val);
         yield return new WaitForSeconds(1);
         AttackHalo.autoScaleType = AutoScaleType.Grow;
         AttackHalo.gameObject.SetActive(true);
@@ -1018,7 +1018,7 @@ public class GameManager : MonoBehaviour
             }
 
             LeanTween.value(gameObject, AnalyzePanel.alpha, 1, 0.2f)
-            .setOnUpdate((float val) => AnalyzePanel.alpha = val);
+            .setOnUpdate(val => AnalyzePanel.alpha = val);
             HideChoicePanel(true);
             HideStatsPanel(true);
         }
@@ -1026,15 +1026,15 @@ public class GameManager : MonoBehaviour
         {
             AnalyzeControls = false;
             LeanTween.value(gameObject, AnalyzePanel.alpha, 0, 0.2f)
-            .setOnUpdate((float val) => AnalyzePanel.alpha = val).setOnComplete(() =>
+            .setOnUpdate(val => AnalyzePanel.alpha = val).setOnComplete(() =>
             {
                 foreach (var text in EnemyStatsText) text.gameObject.SetActive(false);
             });
-            StartCoroutine(delayedAnalyzeHide());
+            StartCoroutine(DelayedAnalyzeHide());
         }
     }
 
-    IEnumerator delayedAnalyzeHide()
+    IEnumerator DelayedAnalyzeHide()
     {
         yield return new WaitForSeconds(0.5f);
         HideChoicePanel(false);

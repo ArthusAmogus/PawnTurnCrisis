@@ -1,16 +1,10 @@
-using System.Collections;
-using System.Collections.Generic;
+
 using UnityEngine;
-using static UnityEngine.GraphicsBuffer;
 
 public class ShootWithMouse : MonoBehaviour
 {
     [SerializeField] private bool DoLog = false;
     [SerializeField] private Vector3 ShootLocation;
-    [Header("Bullet Object")]
-    [SerializeField] private float speed=100;
-    [SerializeField] private float size=0.1f;
-    [SerializeField] private float lifespan = 3f;
     [Header("Bullet Damage")]
     [SerializeField] private bool doDamage;
     public bool doShoot;
@@ -50,8 +44,7 @@ public class ShootWithMouse : MonoBehaviour
     {
         try
         {
-            StatsSystem stats = obj.GetComponent<StatsSystem>();
-            if (stats == null) return;
+            if (!obj.TryGetComponent<StatsSystem>(out var stats)) return;
             if (crit) GameManager.Instance.DoParryEffect();
             stats.TakeDamage(dmg);
         }
