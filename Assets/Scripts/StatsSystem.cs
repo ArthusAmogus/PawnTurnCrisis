@@ -33,6 +33,7 @@ public class StatsSystem : MonoBehaviour
     public bool Damaged;
 
     [Header("Debug")]
+    [SerializeField] int TestDamage=100;
     [SerializeField] private bool DamageEntity;
 
     //Data
@@ -80,7 +81,7 @@ public class StatsSystem : MonoBehaviour
     {
         if (DamageEntity)
         {
-            TakeDamage(100);
+            TakeDamage(TestDamage);
             DamageEntity = false;
         }
 
@@ -118,24 +119,33 @@ public class StatsSystem : MonoBehaviour
 
     public void TakeDamage(int damage)
     {
-        float divisorFactor = (DEF + 10f) / 10f;
         int actualDamage;
 
-        if (DEF > 0)
+        if (DEF == 0)
         {
-            float multiplier = (-0.1f * DEF) + 1.2f;
-            actualDamage = (int)(damage * multiplier);
-        }
-        else if (DEF == 0)
-        {
-            float multiplier = 1.2f;
-            actualDamage = (int)(damage * multiplier);
+            // Special case: No defense modifier, use base multiplier.
+            actualDamage = (int)(damage * 1.2f);
         }
         else
         {
-            float multiplier = (-0.1f * DEF) + 1.2f;
+            float multiplier;
+            if (DEF > 0)
+            {
+                // Positive DEF: Use ratio formula for guaranteed reduction (R1).
+                multiplier = (1.2f / (1.0f + DEF * 0.01f));
+            }
+            else // DEF < 0
+            {
+                // Negative DEF: Keep original amplification formula, which works well here.
+                multiplier = (-0.1f * DEF) + 1.2f;
+            }
+
             actualDamage = (int)(damage * multiplier);
         }
+
+        // FIX R2: Ensure minimum damage is always 10, regardless of calculation result.
+        actualDamage = Mathf.Max(10, actualDamage);
+
 
 
 

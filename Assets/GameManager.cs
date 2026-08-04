@@ -12,6 +12,9 @@ public class GameManager : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool BypassVentReq;
     [SerializeField] private bool AvoidPlayerDamage;
+    [SerializeField] bool doGameControls = true;
+    [SerializeField] bool ShowCursorTrigger;
+    bool _ShowCursorTrigger;
 
     [Header("Debug - Panels")]
     [SerializeField] private float BulletDiagonalAmount;
@@ -246,148 +249,159 @@ public class GameManager : MonoBehaviour
         }
 
         //Choice Panel Controls
-        if (doChoiceControls)
+        if (doGameControls)
         {
-            //ListUp
-            if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) || Input.GetAxis("Mouse ScrollWheel") > 0f)
+            if (doChoiceControls)
             {
-                ChangeList("up");
-            }
-
-            //ListDown
-            if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S) || Input.GetAxis("Mouse ScrollWheel") < 0f)
-            {
-                ChangeList("down");
-            }
-
-            //Shoot
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Z))
-            {
-                ChoiceShoot();
-                RestartTooltip();
-                aud.PlaySound(aud.SoundFX, aud.s_CritGunShot);
-                switch (ChoiceIndex)
+                //ListUp
+                if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W) || Input.GetAxis("Mouse ScrollWheel") > 0f)
                 {
-                    case 0:
-                        {
-                            if (HeldCalliber==HeldCalliberMax|| BypassVentReq)
+                    ChangeList("up");
+                }
+
+                //ListDown
+                if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S) || Input.GetAxis("Mouse ScrollWheel") < 0f)
+                {
+                    ChangeList("down");
+                }
+
+                //Shoot
+                if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Z))
+                {
+                    ChoiceShoot();
+                    RestartTooltip();
+                    aud.PlaySound(aud.SoundFX, aud.s_CritGunShot);
+                    switch (ChoiceIndex)
+                    {
+                        case 0:
                             {
-                                VentMode();
-                                HeldCalliber = 0;
+                                if (HeldCalliber == HeldCalliberMax || BypassVentReq)
+                                {
+                                    VentMode();
+                                    HeldCalliber = 0;
+                                }
+                                else
+                                {
+                                    DisplayMessage("Not enough Held Calliber! End turn with remaining bullets to obtain some.", false, 2);
+                                    aud.PlaySound(aud.SoundFX, aud.s_NoBullets);
+                                }
+                                break;
                             }
-                            else
+                        case 1:
                             {
-                                DisplayMessage("Not enough Held Calliber! End turn with remaining bullets to obtain some.", false, 2);
-                                aud.PlaySound(aud.SoundFX, aud.s_NoBullets);
+                                AnalyzeMode(true);
+                                break;
                             }
-                            break;
-                        }
-                    case 1:
-                        {
-                            AnalyzeMode(true);
-                            break;
-                        }
-                    case 2:
-                        {
-                            NegotiateMode(true);
-                            break;
-                        }
-                    case 3:
-                        {
-                            InventoryMode(true);
-                            break;
-                        }
-                    case 4:
-                        {
-                            ShootMode(true);
-                            break;
-                        }
+                        case 2:
+                            {
+                                NegotiateMode(true);
+                                break;
+                            }
+                        case 3:
+                            {
+                                InventoryMode(true);
+                                break;
+                            }
+                        case 4:
+                            {
+                                ShootMode(true);
+                                break;
+                            }
+                    }
+                }
+            }
+
+            if (doShootControls)
+            {
+                if (PlayerStats.HP <= 0 && isPlayerAlive)
+                {
+                    c_GameOver ??= StartCoroutine(GameOver());
+                    doShootControls = false;
+                    isPlayerAlive = false;
+                }
+
+
+                if (MovedEnemiesAmount >= MovingEnemiesAmount)
+                {
+                    MovingEnemiesAmount = 0;
+                    if (CurEnemies.Count == 0)
+                    {
+                        EndWave();
+                    }
+                    else
+                    {
+                        if (isPlayerAlive) EndTurn();
+                    }
+                }
+
+                if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Z))
+                {
+                    RestartTooltip();
+                    if (ClipIndex > 0)
+                    {
+                        AttackShoot(); //Cylinder and Bullets Animation
+                        Shooter.Shoot();
+                        StartCoroutine(ShootEffect());
+                    }
+                    else
+                    {
+                        aud.PlaySound(aud.SoundFX, aud.s_NoBullets);
+                    }
+
+                }
+
+                if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.X))
+                {
+                    c_Parry ??= StartCoroutine(Parry());
+                }
+            }
+
+            if (VentModeControls)
+            {
+                VentBar.localScale = new(VentDamage / 1000, 1, 1);
+                ColorBleed.intensity = (VentDamage / 1000) * 100;
+                ColorBleed.shift = Mathf.Lerp(ColorBleed.shift, 0.02f, 0.1f);
+                if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
+                {
+                    //Bar and Screen VFXs
+                    if (VentDamage < 1000) VentDamage += Random.Range(10, 30);
+                    ColorBleed.shift = Random.Range(-0.5f * (VentDamage / 1000) * 2, 0.5f * (VentDamage / 1000) * 2);
+
+                    //Muzzle Effect
+                    aud.PlaySound(aud.SoundFX, aud.s_UltShot);
+
+                    var muzzleflash = Instantiate(MuzzleFlash);
+                    var cursorTransform = SightCursor.transform;
+                    muzzleflash.transform.SetParent(cursorTransform.parent, false);
+
+                    if (SightCursor.TryGetComponent<RectTransform>(out var cursorRT) &&
+                        muzzleflash.TryGetComponent<RectTransform>(out var muzzleRT))
+                    {
+                        muzzleRT.localRotation = Quaternion.identity;
+                        muzzleRT.anchoredPosition = cursorRT.anchoredPosition;
+                        muzzleRT.SetAsLastSibling();
+                    }
+                    else
+                    {
+                        muzzleflash.transform.SetPositionAndRotation(cursorTransform.position, cursorTransform.rotation);
+                    }
+                }
+            }
+
+            if (AnalyzeControls)
+            {
+                if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(3))
+                {
+                    AnalyzeMode(false);
                 }
             }
         }
 
-        if (doShootControls)
+        //Triggers
+        if (ShowCursorTrigger!=_ShowCursorTrigger)
         {
-            if (PlayerStats.HP<=0 && isPlayerAlive)
-            {
-                c_GameOver ??= StartCoroutine(GameOver());
-                doShootControls = false;
-                isPlayerAlive = false;
-            }
-            
-
-            if (MovedEnemiesAmount>=MovingEnemiesAmount)
-            {
-                MovingEnemiesAmount = 0;
-                if (CurEnemies.Count == 0)
-                {
-                    EndWave();
-                }
-                else
-                {
-                    if (isPlayerAlive) EndTurn();
-                }
-            }
-
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Z))
-            {
-                RestartTooltip();
-                if (ClipIndex>0)
-                {
-                    AttackShoot(); //Cylinder and Bullets Animation
-                    Shooter.Shoot();
-                    StartCoroutine(ShootEffect());
-                } else
-                {
-                    aud.PlaySound(aud.SoundFX, aud.s_NoBullets);
-                }
-
-            }
-
-            if (Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.RightShift) || Input.GetMouseButtonDown(1) || Input.GetKeyDown(KeyCode.X))
-            {
-                c_Parry ??= StartCoroutine(Parry());
-            }
-        }
-
-        if (VentModeControls)
-        {
-            VentBar.localScale = new(VentDamage/1000, 1, 1);
-            ColorBleed.intensity = (VentDamage/1000)*100;
-            ColorBleed.shift = Mathf.Lerp(ColorBleed.shift, 0.02f, 0.1f);
-            if (Input.GetKeyDown(KeyCode.Space) || Input.GetMouseButtonDown(0))
-            {
-                //Bar and Screen VFXs
-                if (VentDamage<1000) VentDamage += Random.Range(10, 30);
-                ColorBleed.shift = Random.Range(-0.5f*(VentDamage/1000)*2, 0.5f* (VentDamage / 1000) * 2);
-
-                //Muzzle Effect
-                aud.PlaySound(aud.SoundFX, aud.s_UltShot);
-
-                var muzzleflash = Instantiate(MuzzleFlash);
-                var cursorTransform = SightCursor.transform;
-                muzzleflash.transform.SetParent(cursorTransform.parent, false);
-
-                if (SightCursor.TryGetComponent<RectTransform>(out var cursorRT) &&
-                    muzzleflash.TryGetComponent<RectTransform>(out var muzzleRT))
-                {
-                    muzzleRT.localRotation = Quaternion.identity;
-                    muzzleRT.anchoredPosition = cursorRT.anchoredPosition;
-                    muzzleRT.SetAsLastSibling();
-                }
-                else
-                {
-                    muzzleflash.transform.SetPositionAndRotation(cursorTransform.position, cursorTransform.rotation);
-                }
-            }
-        }
-
-        if (AnalyzeControls)
-        {
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(3))
-            {
-                AnalyzeMode(false);
-            }
+            ShowCursor(ShowCursorTrigger);
+            _ShowCursorTrigger = ShowCursorTrigger;
         }
 
         //Variable Syncing
@@ -437,14 +451,14 @@ public class GameManager : MonoBehaviour
             {
                 AttackPanelCanvas.alpha = 0;
             });
-            Cursor.visible = true;
+            ShowCursor(true); // Replaced Cursor.visible = true;
             SightCursor.SetActive(false);
         }
         else
         {
             AttackPanelCanvas.alpha = 1;
             AttackPanel.transform.LeanMoveX(Screen.width - 80, AnimationTime).setEaseOutQuint();
-            Cursor.visible = false;
+            ShowCursor(false); // Replaced Cursor.visible = false;
             SightCursor.SetActive(true);
         }
     }
@@ -455,25 +469,13 @@ public class GameManager : MonoBehaviour
         {
             StageInfo.transform.LeanMoveX(Screen.width + (Screen.width / 2), AnimationTime).setEaseOutQuint();
             StatsPanel.transform.LeanMoveX(-(Screen.width / 2), AnimationTime).setEaseOutQuint();
-            Cursor.visible = false;
+            ShowCursor(false); // Replaced Cursor.visible = false;
         }
         else
         {
             StageInfo.transform.LeanMoveX(Screen.width - 80, AnimationTime).setEaseOutQuint();
             StatsPanel.transform.LeanMoveX(0, AnimationTime).setEaseOutQuint();
-            Cursor.visible = true;
-
-
-            WaveCounter.text = "SCENE : " + ConvertToRomanNumerals(Wave);
-            string diff = PlayerPrefs.GetInt("LVL", 2) switch
-            {
-                1 => "Easy",
-                2 => "Normal",
-                3 => "Hard",
-                _ => "Overclock"
-            };
-            DifficultyDisplay.text = diff;
-            WaveCounter.text = "SCENE : " + ConvertToRomanNumerals(Wave);
+            ShowCursor(true); // Replaced Cursor.visible = true;
         }
     }
 
@@ -532,6 +534,7 @@ public class GameManager : MonoBehaviour
 
     IEnumerator CheckCurEnemy()
     {
+        foreach (var enemies in CurEnemies) enemies.GetComponentInChildren<EnemyAI>().ForceStopTurn();
         yield return new WaitForSeconds(0.5f);
         if (CurEnemies.Count == 0)
         {
@@ -710,7 +713,7 @@ public class GameManager : MonoBehaviour
         DoFirstPersonView();
         HideChoicePanel(true);
         HideAttackPanel(false);
-        ReloadAttackPanel(3);
+        ReloadAttackPanel(Random.Range(1,5));
         DoFirstPersonView();
         StartEnemyTurn();
     }
@@ -761,7 +764,7 @@ public class GameManager : MonoBehaviour
         if (show)
         {
             StatsPanelHalo.SetActive(true);
-            Cursor.visible = false;
+            ShowCursor(false);
             SightCursor.SetActive(true);
             HideChoicePanel(true);
             HideStatsPanel(true);
@@ -800,7 +803,7 @@ public class GameManager : MonoBehaviour
     IEnumerator DelayedNegotiateHide()
     {
         yield return new WaitForSeconds(0.5f);
-        Cursor.visible = true;
+        ShowCursor(true);
         SightCursor.SetActive(false);
         HideChoicePanel(false);
         HideStatsPanel(false);
@@ -1712,4 +1715,9 @@ public class GameManager : MonoBehaviour
         return roman.ToString();
     }
 
+    public void ShowCursor(bool show)
+    {
+        Cursor.visible = show;
+        ShowCursorTrigger = show;
+    }
 }

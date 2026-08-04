@@ -17,6 +17,7 @@ public class EnemyAI : MonoBehaviour
     [SerializeField] private GameObject IdleModle;
     public AudioManager aud;
     [SerializeField] private TextMeshProUGUI LVLText;
+    public Coroutine StartTurnCoroutine;
 
     [Header("Type Properties")]
     [SerializeField] private int type;
@@ -80,7 +81,7 @@ public class EnemyAI : MonoBehaviour
 
     public void DoStartTurn(int num)
     {
-        StartCoroutine(StartTurn(num));
+        StartTurnCoroutine = StartCoroutine(StartTurn(num));
     }
 
     IEnumerator StartTurn(int num)
@@ -266,6 +267,15 @@ public class EnemyAI : MonoBehaviour
                     aud.PlaySound(aud.SoundFX, aud.s_EnemyStep);
                 });
                 break;
+        }
+    }
+
+    public void ForceStopTurn()
+    {
+        LeanTween.cancel(gameObject);
+        if (StartTurnCoroutine != null)
+        {
+            StopCoroutine(StartTurnCoroutine);
         }
     }
 }
