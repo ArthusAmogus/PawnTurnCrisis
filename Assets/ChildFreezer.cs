@@ -2,7 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class TheChildMustBeStayStill : MonoBehaviour
+public class ChildFreezer : MonoBehaviour
 {
     private RectTransform rectTransform;
     private Vector3 initialWorldPosition;

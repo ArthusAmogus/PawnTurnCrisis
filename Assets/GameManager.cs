@@ -665,7 +665,7 @@ public class GameManager : MonoBehaviour
                 {
                     case 0:
                         if (inflictor.AddedHP == 0) break;
-                        foreach (var enemy in enemyStats) enemy.HP = inflictor.AddedHP;
+                        foreach (var enemy in enemyStats) enemy.HP =+ inflictor.AddedHP;
                         if (inflictor.AddedHP > 0)
                             DisplayMessage($"+{inflictor.AddedHP} to enemies' HP!", true, 2);
                         else if (inflictor.AddedHP < 0)
@@ -757,21 +757,10 @@ public class GameManager : MonoBehaviour
             StartCoroutine(DelayedInventoryHide());
         }
     }
-
-    IEnumerator DelayedInventoryHide()
-    {
-        InvUI.ShowInventory(false);
-        yield return new WaitForSeconds(0.5f);
-        HideChoicePanel(false);
-        HideStatsPanel(false);
-        StartUpChoicePanel(false);
-        InvUI.gameObject.SetActive(false);
-    }
-
     public void NegotiateMode(bool show)
     {
-        NegotiateUI.Instance.gameObject.SetActive(true);
-        NegotiateUI.Instance.ShowNegotiatePanel = show;
+        NegotiateSystem.inst.gameObject.SetActive(true);
+        NegotiateSystem.inst.enabled = show;
         if (show)
         {
             StatsPanelHalo.SetActive(true);
@@ -831,7 +820,7 @@ public class GameManager : MonoBehaviour
             {
                 NegotiateList.SetActive(false);
                 NegotiateTitleText.SetActive(false);
-                NegotiateUI.Instance.gameObject.SetActive(false);
+                NegotiateSystem.inst.gameObject.SetActive(false);
             });
         });
 
@@ -852,6 +841,19 @@ public class GameManager : MonoBehaviour
 
         //To do negotiate list
     }
+
+    IEnumerator DelayedInventoryHide()
+    {
+        InvUI.ShowInventory(false);
+        yield return new WaitForSeconds(0.5f);
+        HideChoicePanel(false);
+        HideStatsPanel(false);
+        StartUpChoicePanel(false);
+        InvUI.gameObject.SetActive(false);
+        NegotiateSystem.inst.enabled = false;
+    }
+
+    
 
 
 
